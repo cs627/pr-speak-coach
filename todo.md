@@ -30,5 +30,7 @@
 - [ ] Replace the Azure-dependent upgrade path with browser-only karaoke timing, word matching, visible red/orange error states, and an explicit no-professional-score limitation.
 - [ ] Add browser-only word-level playback timing and current-word karaoke highlighting for the reference sentence.
 - [ ] Add transparent browser-only retry gates for omitted or unmatched words without presenting them as professional pronunciation scores.
-- [ ] Create a private GitHub repository named pr-speak-coach and push the current checked project source without secrets or generated credentials.
-- [ ] Create the approved fallback private repository at cs627/pr-speak-coach because the connected identity cannot create repositories in dickson-crypto.
+- [x] Create a private GitHub repository named pr-speak-coach and push the current checked project source without secrets or generated credentials.
+- [x] Create the approved fallback private repository at cs627/pr-speak-coach because the connected identity cannot create repositories in dickson-crypto.
+- [ ] Audit tracked files and committed history for secrets, API keys, generated credential artifacts, and unintended local files; document the private repository remote after verification.
+- [x] Audit tracked files and committed history for secrets, API keys, generated credential artifacts, and unintended local files; document the private repository remote after verification.
