@@ -35,7 +35,7 @@
 - [x] Confirm GitHub Pages as the requested no-login hosting model and make the repository public with explicit user approval.
 - [ ] Remove mandatory app login from the learning path and provide browser-local persistence for session progress, XP, level, and streak.
 - [ ] Add GitHub publication configuration and documentation appropriate to the selected hosting model, without exposing database or service credentials.
-- [ ] Verify guest access, local progress persistence, and the selected public URL before checkpointing the no-login release.
+- [ ] Verify the normal GitHub Pages public URL without cache-busting and complete a real guest-mode local-progress persistence refresh test before checkpointing the no-login release.
 - [x] Convert the current private repository to the public visibility required by GitHub Pages after explicit user approval; no keys, databases, or server-only source secrets are tracked.
 - [ ] Convert the client build and deployment configuration for repository subpath hosting on GitHub Pages.
 - [x] Remove mandatory app login from the learning path and provide browser-local persistence for session progress, XP, level, and streak.

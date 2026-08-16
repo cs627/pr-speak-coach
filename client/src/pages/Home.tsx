@@ -31,31 +31,22 @@ import {
   SMALL_TALK_SCENARIO,
   type RoleplayEvaluation,
 } from "../../../shared/practice";
+import { completeGuestSession, emptyGuestProgress, normalizeGuestProgress, type GuestProgress } from "@shared/guestProgress";
 
 const SESSION_XP = DAILY_STAGES.reduce((sum, stage) => sum + stage.xp, 0) + 20;
 const LOCAL_PROGRESS_KEY = "pr-speak-coach-guest-progress-v1";
-
-type GuestProgress = {
-  xp: number;
-  streak: number;
-  completedDates: string[];
-};
 
 function getLocalDateKey(date = new Date()) {
   return date.toISOString().slice(0, 10);
 }
 
 function readGuestProgress(): GuestProgress {
-  if (typeof window === "undefined") return { xp: 0, streak: 0, completedDates: [] };
+  if (typeof window === "undefined") return emptyGuestProgress();
   try {
     const stored = JSON.parse(window.localStorage.getItem(LOCAL_PROGRESS_KEY) ?? "null") as Partial<GuestProgress> | null;
-    return {
-      xp: typeof stored?.xp === "number" ? stored.xp : 0,
-      streak: typeof stored?.streak === "number" ? stored.streak : 0,
-      completedDates: Array.isArray(stored?.completedDates) ? stored.completedDates.filter((item): item is string => typeof item === "string") : [],
-    };
+    return normalizeGuestProgress(stored);
   } catch {
-    return { xp: 0, streak: 0, completedDates: [] };
+    return emptyGuestProgress();
   }
 }
 
@@ -294,14 +285,7 @@ export default function Home() {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayKey = getLocalDateKey(yesterday);
-    setGuestProgress(previous => {
-      if (previous.completedDates.includes(today)) return previous;
-      return {
-        xp: previous.xp + SESSION_XP,
-        streak: previous.completedDates.includes(yesterdayKey) ? previous.streak + 1 : 1,
-        completedDates: Array.from(new Set([...previous.completedDates, today])).slice(-35),
-      };
-    });
+    setGuestProgress(previous => completeGuestSession(previous, SESSION_XP, today, yesterdayKey));
   };
 
   return (
