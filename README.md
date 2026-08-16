@@ -35,4 +35,4 @@ pnpm check
 pnpm build:pages
 ```
 
-推送至 `main` 後，GitHub Actions 會建立並發布 GitHub Pages 靜態版本。
+GitHub Pages 目前以 repository 的 `gh-pages` 分支根目錄作為發布來源。每次更新後，請重新執行 `pnpm build:pages`，並把 `dist/public` 的靜態輸出更新至 `gh-pages` 分支。

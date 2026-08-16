@@ -16,6 +16,10 @@ GitHub Pages is enabled and configured to use the `gh-pages` branch. The first p
 
 The site must be rechecked at the public URL after GitHub Pages propagates the latest branch commit.
 
+## Publishing boundary
+
+GitHub Pages is configured to deploy directly from the `gh-pages` branch. A repository workflow file was prepared locally, but the connected GitHub token lacks the `workflows` permission required to push workflow files, so the public repository intentionally relies on the branch deployment source rather than claiming automatic GitHub Actions deployment.
+
 Two public browser checks made immediately after successive `gh-pages` updates still rendered the previous application 404 view. The next verification step is to compare the served document with the newest `gh-pages` commit and distinguish GitHub Pages propagation delay from a browser cache.
 
 The current static page was then verified at `https://cs627.github.io/pr-speak-coach/?release=guest-pages`. It loads the guest interface directly with no sign-in prompt, displays browser-provided English voices, and exposes the daily practice flow. The earlier 404 was a cached prior asset; a query-string refresh loaded the current deployment.
