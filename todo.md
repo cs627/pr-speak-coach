@@ -20,3 +20,14 @@
 - [x] Create and document a dedicated least-privilege OpenRouter API key attempt; server-side validation remains blocked by OpenRouter 403 policy, so AI feedback is intentionally disabled in this release.
 - [x] Complete OpenRouter security and routing investigation; visible settings revealed no safe remediation and the documented 403 block leaves this optional integration disabled.
 - [x] Keep the initial release independent of OpenRouter and Azure; surface AI voice and exact pronunciation scoring only as future, disabled upgrade points.
+- [ ] Select and configure a professional pronunciation assessment service that returns accuracy, fluency, prosody, completeness, and word-level error data.
+- [ ] Securely store the required speech service credentials on the server and verify the assessment endpoint without exposing keys to the browser.
+- [ ] Build an authenticated audio upload and assessment flow that preserves recorded speech only as needed for scoring.
+- [ ] Render karaoke-style sentence captions with timed playback progress and per-word green, amber, and red pronunciation states.
+- [ ] Enforce a transparent score threshold before each sentence can pass, with clear retry guidance for weak or omitted words.
+- [ ] Persist professional assessment results and word-level feedback per learner attempt.
+- [ ] Test assessment success, error, retry, threshold, desktop, and mobile feedback states before checkpointing the upgrade.
+- [ ] Replace the Azure-dependent upgrade path with browser-only karaoke timing, word matching, visible red/orange error states, and an explicit no-professional-score limitation.
+- [ ] Add browser-only word-level playback timing and current-word karaoke highlighting for the reference sentence.
+- [ ] Add transparent browser-only retry gates for omitted or unmatched words without presenting them as professional pronunciation scores.
+- [ ] Create a private GitHub repository named pr-speak-coach and push the current checked project source without secrets or generated credentials.
