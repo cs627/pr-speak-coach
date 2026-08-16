@@ -31,3 +31,4 @@
 - [ ] Add browser-only word-level playback timing and current-word karaoke highlighting for the reference sentence.
 - [ ] Add transparent browser-only retry gates for omitted or unmatched words without presenting them as professional pronunciation scores.
 - [ ] Create a private GitHub repository named pr-speak-coach and push the current checked project source without secrets or generated credentials.
+- [ ] Create the approved fallback private repository at cs627/pr-speak-coach because the connected identity cannot create repositories in dickson-crypto.
