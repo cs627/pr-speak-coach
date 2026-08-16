@@ -32,6 +32,15 @@
 - [ ] Verify revised demonstration speech on desktop and mobile with user feedback before marking the audio issue resolved.
 - [x] Disable demo playback when the device has no English voice, so it never silently falls back to an unsuitable system default.
 - [ ] Verify voice-list loading, selected-voice playback, and no-English-voice fallback on a real user device or browser session.
+- [x] Confirm GitHub Pages as the requested no-login hosting model and make the repository public with explicit user approval.
+- [ ] Remove mandatory app login from the learning path and provide browser-local persistence for session progress, XP, level, and streak.
+- [ ] Add GitHub publication configuration and documentation appropriate to the selected hosting model, without exposing database or service credentials.
+- [ ] Verify guest access, local progress persistence, and the selected public URL before checkpointing the no-login release.
+- [x] Convert the current private repository to the public visibility required by GitHub Pages after explicit user approval; no keys, databases, or server-only source secrets are tracked.
+- [ ] Convert the client build and deployment configuration for repository subpath hosting on GitHub Pages.
+- [x] Remove mandatory app login from the learning path and provide browser-local persistence for session progress, XP, level, and streak.
+- [x] Add GitHub publication configuration and documentation appropriate to GitHub Pages, without exposing database or service credentials.
+- [x] Convert the client build and deployment configuration for repository subpath hosting on GitHub Pages.
 - [x] Replace the Azure-dependent upgrade path with browser-only karaoke timing, word matching, visible red/orange error states, and an explicit no-professional-score limitation.
 - [x] Add browser-only word-level playback timing and current-word karaoke highlighting for the reference sentence.
 - [x] Add transparent browser-only retry gates for omitted or unmatched words without presenting them as professional pronunciation scores.

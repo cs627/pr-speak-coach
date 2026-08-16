@@ -1,10 +1,7 @@
 import { startLogin } from "@/const";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { trpc } from "@/lib/trpc";
 import {
-  ArrowRight,
   BarChart3,
   BookOpen,
   Check,
@@ -35,9 +32,32 @@ import {
   type RoleplayEvaluation,
 } from "../../../shared/practice";
 
-const DISPLAY_XP = 280;
-const DISPLAY_STREAK = 6;
 const SESSION_XP = DAILY_STAGES.reduce((sum, stage) => sum + stage.xp, 0) + 20;
+const LOCAL_PROGRESS_KEY = "pr-speak-coach-guest-progress-v1";
+
+type GuestProgress = {
+  xp: number;
+  streak: number;
+  completedDates: string[];
+};
+
+function getLocalDateKey(date = new Date()) {
+  return date.toISOString().slice(0, 10);
+}
+
+function readGuestProgress(): GuestProgress {
+  if (typeof window === "undefined") return { xp: 0, streak: 0, completedDates: [] };
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(LOCAL_PROGRESS_KEY) ?? "null") as Partial<GuestProgress> | null;
+    return {
+      xp: typeof stored?.xp === "number" ? stored.xp : 0,
+      streak: typeof stored?.streak === "number" ? stored.streak : 0,
+      completedDates: Array.isArray(stored?.completedDates) ? stored.completedDates.filter((item): item is string => typeof item === "string") : [],
+    };
+  } catch {
+    return { xp: 0, streak: 0, completedDates: [] };
+  }
+}
 
 type MediaRecorderWithState = MediaRecorder & { stream?: MediaStream };
 type BrowserRecognition = {
@@ -102,7 +122,6 @@ function Metric({ label, value, tone = "dark" }: { label: string; value: number;
 }
 
 export default function Home() {
-  const { user, loading, isAuthenticated } = useAuth();
   const [stageIndex, setStageIndex] = useState(0);
   const [attempts, setAttempts] = useState<Record<string, number>>({});
   const [completedStages, setCompletedStages] = useState<string[]>([]);
@@ -120,6 +139,7 @@ export default function Home() {
   const [recordingMode, setRecordingMode] = useState<"shadow" | "roleplay">("shadow");
   const [roleplayResult, setRoleplayResult] = useState<RoleplayEvaluation | null>(null);
   const [sessionComplete, setSessionComplete] = useState(false);
+  const [guestProgress, setGuestProgress] = useState<GuestProgress>(readGuestProgress);
   const recorderRef = useRef<MediaRecorderWithState | null>(null);
   const recognitionRef = useRef<BrowserRecognition | null>(null);
   const stage = DAILY_STAGES[stageIndex];
@@ -135,13 +155,8 @@ export default function Home() {
   const selectedVoice = useMemo(() => availableVoices.find(voice => voice.voiceURI === selectedVoiceUri) ?? pickAmericanVoice(availableVoices), [availableVoices, selectedVoiceUri]);
   const transcriptEvaluation = transcript ? evaluateBrowserTranscript(stage.sentence, transcript) : null;
   const currentSignal = transcriptEvaluation ?? { ...practiceSignal(currentAttempt, false), completeness: 0, overallScore: 0, passed: false };
-  const dashboardQuery = trpc.practice.dashboard.useQuery(undefined, { enabled: isAuthenticated });
-  const saveSentence = trpc.practice.saveSentenceAttempt.useMutation();
-  const saveRoleplay = trpc.practice.saveSmallTalkResponse.useMutation();
-  const completeSession = trpc.practice.completeDailySession.useMutation();
-  const persistedXp = dashboardQuery.data?.profile?.xp;
-  const baseXp = isAuthenticated ? (persistedXp ?? 0) : DISPLAY_XP;
-  const currentSessionXp = sessionComplete ? SESSION_XP : completedStages.reduce((total, stageId) => total + (DAILY_STAGES.find(item => item.id === stageId)?.xp ?? 0), 0);
+  const baseXp = guestProgress.xp;
+  const currentSessionXp = sessionComplete ? 0 : completedStages.reduce((total, stageId) => total + (DAILY_STAGES.find(item => item.id === stageId)?.xp ?? 0), 0);
   const syntheticXp = baseXp + currentSessionXp;
   const levelProgress = getLevelProgress(syntheticXp);
   const levelInfo = LEVELS[levelProgress.level];
@@ -150,19 +165,16 @@ export default function Home() {
   const sessionProgress = Math.round((completedCount / totalSteps) * 100);
 
   const historyLevels = useMemo(() => {
-    const completed = new Set(
-      dashboardQuery.data?.history.filter(item => item.status === "completed").map(item => String(item.sessionDate)) ?? [],
-    );
+    const completed = new Set(guestProgress.completedDates);
     const today = new Date();
     return Array.from({ length: 35 }, (_, index) => {
       const date = new Date(today);
       date.setDate(today.getDate() - (34 - index));
       const key = date.toISOString().slice(0, 10);
       if (completed.has(key)) return 3;
-      if (!isAuthenticated && [2, 3, 6, 9, 12, 16, 18, 22, 25, 27, 30, 33].includes(index)) return index % 3 === 0 ? 2 : 1;
       return 0;
     });
-  }, [dashboardQuery.data?.history, isAuthenticated]);
+  }, [guestProgress.completedDates]);
 
   useEffect(() => {
     return () => {
@@ -186,6 +198,10 @@ export default function Home() {
     window.speechSynthesis.addEventListener("voiceschanged", updateVoices);
     return () => window.speechSynthesis.removeEventListener("voiceschanged", updateVoices);
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(LOCAL_PROGRESS_KEY, JSON.stringify(guestProgress));
+  }, [guestProgress]);
 
   const startRecording = async (mode: "shadow" | "roleplay" = "shadow") => {
     setRecordingError(null);
@@ -257,14 +273,6 @@ export default function Home() {
   const passStage = () => {
     if (!currentSignal.passed || completedStages.includes(stage.id)) return;
     setCompletedStages(previous => [...previous, stage.id]);
-    if (isAuthenticated) {
-      saveSentence.mutate({
-        sentenceKey: stage.id,
-        transcript: transcript || null,
-        ...currentSignal,
-        feedbackJson: JSON.stringify({ mode: transcriptEvaluation ? "browser-speech-recognition" : "browser-practice", wordFeedback: transcriptEvaluation?.wordFeedback ?? [], note: "Browser practice signal; not an AI pronunciation assessment." }),
-      });
-    }
     if (stageIndex < DAILY_STAGES.length - 1) {
       setStageIndex(stageIndex + 1);
       setRecordedUrl(null);
@@ -277,18 +285,24 @@ export default function Home() {
     if (!response) return;
     const result = evaluateRoleplay(response);
     setRoleplayResult(result);
-    if (isAuthenticated) {
-      saveRoleplay.mutate({ scenarioKey: SMALL_TALK_SCENARIO.id, responseText: response, ...result });
-    }
   };
 
   const finishSession = () => {
     if (completedStages.length !== DAILY_STAGES.length || !roleplayResult) return;
     setSessionComplete(true);
-    if (isAuthenticated) completeSession.mutate({ xpEarned: SESSION_XP, overallScore: Math.round((currentSignal.overallScore + roleplayResult.overallScore) / 2) });
+    const today = getLocalDateKey();
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = getLocalDateKey(yesterday);
+    setGuestProgress(previous => {
+      if (previous.completedDates.includes(today)) return previous;
+      return {
+        xp: previous.xp + SESSION_XP,
+        streak: previous.completedDates.includes(yesterdayKey) ? previous.streak + 1 : 1,
+        completedDates: Array.from(new Set([...previous.completedDates, today])).slice(-35),
+      };
+    });
   };
-
-  if (loading) return <div className="min-h-screen bg-[#fbfaf7]" />;
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#fbfaf7] text-[#151514]">
@@ -301,7 +315,7 @@ export default function Home() {
           <nav className="hidden items-center gap-7 text-[0.86rem] font-semibold text-[#55534e] md:flex" aria-label="Main navigation">
             <a className="hover:text-[#151514]" href="#today">Today</a><a className="hover:text-[#151514]" href="#library">Library</a><a className="hover:text-[#151514]" href="#progress">Progress</a>
           </nav>
-          {isAuthenticated ? <div className="flex items-center gap-3"><span className="hidden text-sm font-semibold sm:block">{user?.name?.split(" ")[0] ?? "Coach"}</span><span className="grid h-10 w-10 place-items-center rounded-full bg-[#e6f2ed] text-sm font-bold text-[#1d6c59]">{user?.name?.charAt(0).toUpperCase() ?? "P"}</span></div> : <Button onClick={() => startLogin()} className="active-press rounded-xl bg-[#151514] px-5 py-5 text-sm font-bold hover:bg-[#383733]">Save my progress <ArrowRight className="ml-2" size={16} /></Button>}
+          <div className="flex items-center gap-3"><span className="hidden text-sm font-semibold sm:block">Guest practice</span><span className="grid h-10 w-10 place-items-center rounded-full bg-[#e6f2ed] text-sm font-bold text-[#1d6c59]">G</span></div>
         </div>
       </header>
 
@@ -320,7 +334,7 @@ export default function Home() {
 
         <section id="today" className="mt-11 grid gap-7 xl:grid-cols-[minmax(0,1fr)_330px]">
           <div className="coach-card overflow-hidden">
-            <div className="flex flex-col gap-5 border-b border-[#e5e2da] p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8"><div><p className="eyebrow">Today&apos;s voice room</p><h2 className="serif-display mt-1 text-[2.3rem] leading-none tracking-[-0.04em]">The moment before the message</h2></div><div className="flex items-center gap-3"><span className="rounded-full bg-[#f7eee9] px-3 py-2 text-sm font-bold text-[#9c451f]"><Flame className="mr-1 inline" size={16} /> {dashboardQuery.data?.profile?.streak ?? DISPLAY_STREAK} day streak</span><span className="rounded-full bg-[#e6f2ed] px-3 py-2 text-sm font-bold text-[#1d6c59]">{sessionProgress}% done</span></div></div>
+            <div className="flex flex-col gap-5 border-b border-[#e5e2da] p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8"><div><p className="eyebrow">Today&apos;s voice room</p><h2 className="serif-display mt-1 text-[2.3rem] leading-none tracking-[-0.04em]">The moment before the message</h2></div><div className="flex items-center gap-3"><span className="rounded-full bg-[#f7eee9] px-3 py-2 text-sm font-bold text-[#9c451f]"><Flame className="mr-1 inline" size={16} /> {guestProgress.streak} day streak</span><span className="rounded-full bg-[#e6f2ed] px-3 py-2 text-sm font-bold text-[#1d6c59]">{sessionProgress}% done</span></div></div>
             <div className="p-6 sm:p-8">
               <div className="mb-8 flex items-center gap-3" aria-label="Session progress">{[...DAILY_STAGES, { id: "roleplay" }].map((item, index) => <div key={item.id} className="flex flex-1 items-center gap-2"><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-bold ${index < completedCount ? "bg-[#1d6c59] text-white" : index === completedCount ? "border-2 border-[#1d6c59] bg-white text-[#1d6c59]" : "bg-[#f0eee7] text-[#9a978e]"}`}>{index < completedCount ? <Check size={16} /> : index + 1}</span>{index < totalSteps - 1 && <span className={`h-1 flex-1 rounded-full ${index < completedCount ? "bg-[#1d6c59]" : "bg-[#e7e4dc]"}`} />}</div>)}</div>
 
@@ -346,14 +360,14 @@ export default function Home() {
         <section id="library" className="mt-8 grid gap-7 lg:grid-cols-[.88fr_1.12fr]">
           <div className="coach-card p-6 sm:p-8"><p className="eyebrow">04 · SMALL TALK ROOM</p><h2 className="serif-display mt-2 text-[2.4rem] leading-none tracking-[-.045em]">Make the conversation feel easy.</h2><p className="mt-4 max-w-lg text-[1.05rem] leading-relaxed text-[#5f5d57]">{SMALL_TALK_SCENARIO.prompt}</p><div className="mt-6 rounded-2xl bg-[#f0eee7] p-4"><p className="micro-label">Response guide</p><p className="mt-1 text-sm leading-relaxed text-[#5f5d57]">{SMALL_TALK_SCENARIO.responseGuide}</p></div><div className="mt-6 flex flex-wrap gap-3">{isRecording && recordingMode === "roleplay" ? <Button onClick={stopRecording} className="active-press h-12 rounded-xl bg-[#b8402c] px-5 font-bold hover:bg-[#9f3424]"><Pause className="mr-2" size={17} /> Stop & review</Button> : <Button onClick={() => startRecording("roleplay")} variant="outline" className="active-press h-12 rounded-xl border-[#d8d4c9] bg-white font-bold"><Mic className="mr-2" size={17} /> Speak my response</Button>}<span className="self-center text-sm text-[#6e6b63]">{roleplayTranscript ? "Your spoken response is ready to review." : "Speak first; use the text box only if you want to refine a phrase."}</span></div>{roleplayTranscript && <div className="reward-pop mt-4 rounded-2xl border border-[#d7e6de] bg-[#f5fbf8] p-4 text-sm"><p className="font-bold text-[#1d6c59]">Browser heard: “{roleplayTranscript}”</p><p className="mt-1 text-[#6e6b63]">Check the transcript quickly, then review your spoken small talk.</p></div>}</div>
           <div className="coach-card p-6 sm:p-8"><div className="flex items-center justify-between gap-4"><div><p className="eyebrow">Your practice recap</p><h3 className="mt-1 text-xl font-bold tracking-[-.04em]">What did you say?</h3></div>{roleplayResult && <span className="rounded-full bg-[#e6f2ed] px-3 py-2 text-sm font-bold text-[#1d6c59]">{roleplayResult.overallScore}/100 practice signal</span>}</div><Textarea value={roleplayText} onChange={event => setRoleplayText(event.target.value)} placeholder="Optional: refine the key line in writing. Your recorded spoken response is used first when available." className="mt-5 min-h-36 rounded-2xl border-[#d8d4c9] bg-[#fffefa] p-4 text-[1rem] leading-relaxed placeholder:text-[#9b978d] focus-visible:ring-[#1d6c59]" />
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><p className="max-w-md text-sm leading-relaxed text-[#6e6b63]">Transparent rules check: event context, warm opener, open question, and a personal bridge. No external AI is used.</p><Button disabled={!(roleplayTranscript.trim() || roleplayText.trim())} onClick={scoreRoleplay} className="active-press h-12 rounded-xl bg-[#151514] px-5 font-bold hover:bg-[#383733]">Review my small talk <ArrowRight className="ml-2" size={17} /></Button></div>
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><p className="max-w-md text-sm leading-relaxed text-[#6e6b63]">Transparent rules check: event context, warm opener, open question, and a personal bridge. No external AI is used.</p><Button disabled={!(roleplayTranscript.trim() || roleplayText.trim())} onClick={scoreRoleplay} className="active-press h-12 rounded-xl bg-[#151514] px-5 font-bold hover:bg-[#383733]">Review my small talk <ChevronRight className="ml-2" size={17} /></Button></div>
             {roleplayResult && <div className="reward-pop mt-6 grid gap-4 rounded-[1.25rem] border border-[#d7e6de] bg-[#f5fbf8] p-5 sm:grid-cols-[1fr_auto]"><div><p className="text-lg font-bold">You created a useful entry point.</p><ul className="mt-2 space-y-1 text-sm text-[#416154]">{roleplayResult.strengths.map(strength => <li className="flex gap-2" key={strength}><Check className="mt-0.5 shrink-0 text-[#1d6c59]" size={15} />{strength}</li>)}</ul><p className="mt-3 text-sm font-semibold text-[#9c451f]">Next move: {roleplayResult.nextMove}</p></div><div className="grid grid-cols-3 gap-2 sm:w-52"><Metric label="Relevance" value={roleplayResult.relevance} tone="green" /><Metric label="Natural" value={roleplayResult.naturalness} tone="warm" /><Metric label="Connect" value={roleplayResult.connection} /></div></div>}
           </div>
         </section>
 
         <section className="mt-8 coach-card p-6 sm:p-8"><div className="flex flex-col gap-4 border-b border-[#e5e2da] pb-6 sm:flex-row sm:items-end sm:justify-between"><div><p className="eyebrow">PR situation library</p><h2 className="serif-display mt-2 text-[2.45rem] leading-none tracking-[-.045em]">Train for the rooms that matter.</h2></div><p className="max-w-sm text-sm leading-relaxed text-[#6e6b63]">Each room adds a practical phrase set, listen-first rhythm drill, and confident-response rehearsal.</p></div><div className="mt-6 grid gap-3 lg:grid-cols-5">{PR_SCENARIO_LIBRARY.map(scenario => { const unlocked = scenario.minimumXp <= syntheticXp; return <div className={`rounded-[1.2rem] border p-4 transition-transform ${unlocked ? "border-[#e5e2da] bg-[#fffefa] hover:-translate-y-0.5" : "border-[#e5e2da] bg-[#f5f3ed] opacity-70"}`} key={scenario.id}><div className="flex items-center justify-between"><span className="grid h-9 w-9 place-items-center rounded-xl" style={{ backgroundColor: scenario.accent }}><BookOpen size={17} /></span>{unlocked ? <span className="rounded-full bg-[#e6f2ed] px-2 py-1 text-[0.63rem] font-bold uppercase tracking-[.1em] text-[#1d6c59]">Ready</span> : <LockKeyhole size={16} className="text-[#88847a]" />}</div><p className="mt-5 text-[1.05rem] font-bold tracking-[-.03em]">{scenario.title}</p><p className="mt-2 min-h-14 text-sm leading-relaxed text-[#6e6b63]">{scenario.detail}</p><div className="mt-4 flex items-center justify-between text-xs font-bold uppercase tracking-[.1em] text-[#6e6b63]"><span>{scenario.minutes} min</span><span>{LEVELS[scenario.level].label}</span></div></div>; })}</div></section>
 
-        <section className="mt-8 coach-card overflow-hidden"><div className="flex flex-col gap-6 bg-[#151514] p-7 text-white sm:flex-row sm:items-center sm:justify-between sm:p-9"><div><p className="eyebrow text-[#bfc6c0]">Finish today&apos;s room</p><h2 className="serif-display mt-2 text-[2.5rem] leading-none tracking-[-.045em]">Leave with a voice worth remembering.</h2><p className="mt-3 max-w-2xl text-[1.02rem] text-[#d7dad6]">Complete the three voice moments and the small-talk rehearsal to bank {SESSION_XP} XP and protect your streak.</p></div><Button disabled={completedStages.length !== DAILY_STAGES.length || !roleplayResult || sessionComplete} onClick={finishSession} className="active-press h-14 rounded-xl bg-[#d98a54] px-6 text-base font-bold text-[#20130c] hover:bg-[#ed9c64]">{sessionComplete ? <><Check className="mr-2" size={18} /> Today complete</> : <>Complete session <Trophy className="ml-2" size={18} /></>}</Button></div>{sessionComplete && <div className="reward-pop flex flex-col gap-3 p-6 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#e6f2ed] text-[#1d6c59]"><Sparkles size={23} /></span><div><p className="font-bold">Session saved to your practice story.</p><p className="text-sm text-[#6e6b63]">+{SESSION_XP} XP · {formatMinutes(15)} invested in your next confident conversation.</p></div></div>{!isAuthenticated && <Button onClick={() => startLogin()} variant="outline" className="active-press rounded-xl border-[#d8d4c9] bg-white font-bold">Sign in to keep this streak</Button>}</div>}</section>
+        <section className="mt-8 coach-card overflow-hidden"><div className="flex flex-col gap-6 bg-[#151514] p-7 text-white sm:flex-row sm:items-center sm:justify-between sm:p-9"><div><p className="eyebrow text-[#bfc6c0]">Finish today&apos;s room</p><h2 className="serif-display mt-2 text-[2.5rem] leading-none tracking-[-.045em]">Leave with a voice worth remembering.</h2><p className="mt-3 max-w-2xl text-[1.02rem] text-[#d7dad6]">Complete the three voice moments and the small-talk rehearsal to bank {SESSION_XP} XP and protect your streak.</p></div><Button disabled={completedStages.length !== DAILY_STAGES.length || !roleplayResult || sessionComplete} onClick={finishSession} className="active-press h-14 rounded-xl bg-[#d98a54] px-6 text-base font-bold text-[#20130c] hover:bg-[#ed9c64]">{sessionComplete ? <><Check className="mr-2" size={18} /> Today complete</> : <>Complete session <Trophy className="ml-2" size={18} /></>}</Button></div>{sessionComplete && <div className="reward-pop flex items-center gap-3 p-6"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#e6f2ed] text-[#1d6c59]"><Sparkles size={23} /></span><div><p className="font-bold">Session saved on this device.</p><p className="text-sm text-[#6e6b63]">+{SESSION_XP} XP · {formatMinutes(15)} invested in your next confident conversation.</p></div></div>}</section>
       </main>
       <footer className="border-t border-[#e5e2da] py-8 text-center text-sm text-[#6e6b63]">PR Speak Coach · Browser-first practice · Exact AI scoring is intentionally disabled in this zero-cost version.</footer>
     </div>
