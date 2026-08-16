@@ -17,4 +17,11 @@
 1. 点击 **Listen first**，确认所选浏览器声音可听见且语速舒适。
 2. 点击 **Record my voice**，允许麦克风权限，朗读句子后点击 **Stop**；确认可播放录音，再点击 **Try again**。
 3. 在 **Small Talk Room** 点击 **Speak my response**，说出两到四句回应；确认浏览器转写出现后点击 **Review my small talk**。
-4. 完成三段 Shadowing 与小聊复盘，点击 **Complete session**；刷新页面，确认 XP、Streak、热力图和解锁状态仍被保留。
+4. 完成三段 Shadowing 與小聊復盤，點擊 **Complete session**；刷新頁面，確認 XP、Streak、熱力圖和解鎖狀態仍被保留。
+
+## Browser-only karaoke verification
+
+1. 在 Chrome 或 Edge 點擊 **Listen first**，確認播放時字詞依次反白；若設備不提供字詞邊界事件，完整示範聲音仍應可播放。
+2. 點擊 **Record my voice**，朗讀原句後停止。確認轉寫比對結果中，完整匹配為綠色、相近文字為橙色、沒有辨識到的字詞為紅色。
+3. 嘗試略過一個字詞，確認 **Pass & continue** 保持停用；重新錄讀，直到至少 90% 字詞綠色匹配後才可通過。
+4. 確認介面始終將回饋標示為 browser recognition，而不會聲稱提供專業發音、音素、口音或韻律分數。

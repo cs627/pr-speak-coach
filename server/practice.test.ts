@@ -2,16 +2,19 @@ import { describe, expect, it } from "vitest";
 import { evaluateBrowserTranscript, evaluateRoleplay, getLevelForXp, getLevelProgress, nextStreak, practiceSignal } from "../shared/practice";
 
 describe("practice rules", () => {
-  it("only passes a shadowing signal after a recording exists", () => {
+  it("does not pass a shadowing gate merely because a recording exists", () => {
     expect(practiceSignal(1, false).passed).toBe(false);
-    expect(practiceSignal(1, true).passed).toBe(true);
+    expect(practiceSignal(1, true).passed).toBe(false);
   });
 
   it("marks recognised and missing words separately for browser speech feedback", () => {
     const score = evaluateBrowserTranscript("Thank you for joining us today", "Thank you for joining today");
     expect(score.wordFeedback.find(item => item.word === "us")?.matched).toBe(false);
+    expect(score.wordFeedback.find(item => item.word === "us")?.status).toBe("missing");
     expect(score.wordFeedback.find(item => item.word === "thank")?.matched).toBe(true);
     expect(score.completeness).toBeLessThan(100);
+    expect(score.passed).toBe(false);
+    expect(evaluateBrowserTranscript("Thank you for joining us today", "Thank you for joining us today").passed).toBe(true);
   });
 
   it("progresses levels at the intended XP thresholds", () => {

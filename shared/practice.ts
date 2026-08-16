@@ -103,20 +103,40 @@ export function practiceSignal(attemptNumber: number, hasRecording: boolean) {
     prosody: clamp(overallScore - 5),
     completeness: hasRecording ? 100 : 55,
     overallScore,
-    passed: hasRecording && overallScore >= 70,
+    passed: false,
   };
 }
 
-export type BrowserWordFeedback = { word: string; matched: boolean };
+export type BrowserWordFeedback = { word: string; matched: boolean; status: "matched" | "near" | "missing" };
 
 function spokenWords(text: string) {
   return text.toLowerCase().match(/[a-z']+/g) ?? [];
 }
 
+function editDistance(left: string, right: string) {
+  const rows = Array.from({ length: left.length + 1 }, (_, index) => index);
+  for (let column = 1; column <= right.length; column += 1) {
+    let diagonal = rows[0];
+    rows[0] = column;
+    for (let row = 1; row <= left.length; row += 1) {
+      const previous = rows[row];
+      rows[row] = Math.min(rows[row] + 1, rows[row - 1] + 1, diagonal + (left[row - 1] === right[column - 1] ? 0 : 1));
+      diagonal = previous;
+    }
+  }
+  return rows[left.length];
+}
+
 export function evaluateBrowserTranscript(reference: string, transcript: string) {
   const expected = spokenWords(reference);
-  const heard = new Set(spokenWords(transcript));
-  const wordFeedback: BrowserWordFeedback[] = expected.map(word => ({ word, matched: heard.has(word) }));
+  const heard = spokenWords(transcript);
+  const heardSet = new Set(heard);
+  const wordFeedback: BrowserWordFeedback[] = expected.map(word => {
+    if (heardSet.has(word)) return { word, matched: true, status: "matched" };
+    const closestDistance = Math.min(...heard.map(candidate => editDistance(word, candidate)), Infinity);
+    const near = word.length >= 4 && closestDistance <= Math.max(1, Math.floor(word.length * 0.25));
+    return { word, matched: false, status: near ? "near" : "missing" };
+  });
   const matched = wordFeedback.filter(item => item.matched).length;
   const completeness = clamp((matched / Math.max(1, expected.length)) * 100);
   const accuracy = clamp(48 + completeness * 0.52);
@@ -129,7 +149,7 @@ export function evaluateBrowserTranscript(reference: string, transcript: string)
     prosody,
     completeness,
     overallScore,
-    passed: completeness >= 76 && overallScore >= 72,
+    passed: completeness >= 90 && overallScore >= 75,
     wordFeedback,
   };
 }

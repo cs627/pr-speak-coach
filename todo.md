@@ -20,17 +20,22 @@
 - [x] Create and document a dedicated least-privilege OpenRouter API key attempt; server-side validation remains blocked by OpenRouter 403 policy, so AI feedback is intentionally disabled in this release.
 - [x] Complete OpenRouter security and routing investigation; visible settings revealed no safe remediation and the documented 403 block leaves this optional integration disabled.
 - [x] Keep the initial release independent of OpenRouter and Azure; surface AI voice and exact pronunciation scoring only as future, disabled upgrade points.
-- [ ] Select and configure a professional pronunciation assessment service that returns accuracy, fluency, prosody, completeness, and word-level error data.
-- [ ] Securely store the required speech service credentials on the server and verify the assessment endpoint without exposing keys to the browser.
-- [ ] Build an authenticated audio upload and assessment flow that preserves recorded speech only as needed for scoring.
-- [ ] Render karaoke-style sentence captions with timed playback progress and per-word green, amber, and red pronunciation states.
-- [ ] Enforce a transparent score threshold before each sentence can pass, with clear retry guidance for weak or omitted words.
-- [ ] Persist professional assessment results and word-level feedback per learner attempt.
-- [ ] Test assessment success, error, retry, threshold, desktop, and mobile feedback states before checkpointing the upgrade.
-- [ ] Replace the Azure-dependent upgrade path with browser-only karaoke timing, word matching, visible red/orange error states, and an explicit no-professional-score limitation.
-- [ ] Add browser-only word-level playback timing and current-word karaoke highlighting for the reference sentence.
-- [ ] Add transparent browser-only retry gates for omitted or unmatched words without presenting them as professional pronunciation scores.
+- [x] Defer professional pronunciation assessment service by user request not to use Azure or external speech services; document the browser-only limitation.
+- [x] Defer external speech-service credential storage and endpoint verification by user request not to use Azure or external speech services.
+- [x] Preserve browser recordings locally for playback and use browser recognition only; no audio upload is performed in the zero-service version.
+- [x] Render karaoke-style sentence captions with timed playback progress and per-word green, amber, and red browser-matching states.
+- [x] Enforce a transparent 90% browser word-match threshold before each sentence can pass, with explicit retry guidance for near and unmatched words.
+- [x] Persist browser assessment signals and word-level feedback per learner attempt; professional assessment remains intentionally unavailable.
+- [ ] Verify browser-only karaoke playback, recognition, error, retry, threshold, desktop, and mobile feedback states on a real device; automated rules, build checks, visual checks, and manual QA instructions are ready.
+- [x] Diagnose the current browser speech synthesis voice selection: an empty/late en-US voice list could cause fallback to an unsuitable device default voice.
+- [x] Replace implicit voice picking with user-visible English voice selection, normal speaking parameters, and a clear no-English-voice device fallback.
+- [ ] Verify revised demonstration speech on desktop and mobile with user feedback before marking the audio issue resolved.
+- [x] Disable demo playback when the device has no English voice, so it never silently falls back to an unsuitable system default.
+- [ ] Verify voice-list loading, selected-voice playback, and no-English-voice fallback on a real user device or browser session.
+- [x] Replace the Azure-dependent upgrade path with browser-only karaoke timing, word matching, visible red/orange error states, and an explicit no-professional-score limitation.
+- [x] Add browser-only word-level playback timing and current-word karaoke highlighting for the reference sentence.
+- [x] Add transparent browser-only retry gates for omitted or unmatched words without presenting them as professional pronunciation scores.
 - [x] Create a private GitHub repository named pr-speak-coach and push the current checked project source without secrets or generated credentials.
 - [x] Create the approved fallback private repository at cs627/pr-speak-coach because the connected identity cannot create repositories in dickson-crypto.
-- [ ] Audit tracked files and committed history for secrets, API keys, generated credential artifacts, and unintended local files; document the private repository remote after verification.
+- [x] Audit tracked files and committed history for secrets, API keys, generated credential artifacts, and unintended local files; document the private repository remote after verification.
 - [x] Audit tracked files and committed history for secrets, API keys, generated credential artifacts, and unintended local files; document the private repository remote after verification.

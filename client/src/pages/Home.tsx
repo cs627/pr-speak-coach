@@ -58,23 +58,37 @@ function formatMinutes(total: number) {
 
 function pickAmericanVoice(voices: SpeechSynthesisVoice[]) {
   const american = voices.filter(voice => voice.lang.toLowerCase().startsWith("en-us"));
-  return american.find(voice => /guy|david|aaron|daniel|male|alex/i.test(voice.name)) ?? american[0];
+  const candidates = american.length > 0 ? american : voices.filter(voice => voice.lang.toLowerCase().startsWith("en"));
+  const preferredNames = [/microsoft.*(andrew|guy|davis|david)/i, /google us english/i, /alex/i, /daniel/i, /aaron/i];
+  return [...candidates].sort((left, right) => {
+    const leftRank = preferredNames.findIndex(pattern => pattern.test(left.name));
+    const rightRank = preferredNames.findIndex(pattern => pattern.test(right.name));
+    return (leftRank === -1 ? preferredNames.length : leftRank) - (rightRank === -1 ? preferredNames.length : rightRank);
+  })[0];
 }
 
-function speakSentence(text: string, setSpeaking: (value: boolean) => void) {
-  if (!("speechSynthesis" in window)) return;
+function wordIndexAtCharacter(text: string, characterIndex: number) {
+  const words = Array.from(text.matchAll(/[A-Za-z']+/g));
+  const index = words.findIndex(match => characterIndex >= (match.index ?? 0) && characterIndex < (match.index ?? 0) + match[0].length);
+  return index >= 0 ? index : -1;
+}
+
+function speakSentence(text: string, voice: SpeechSynthesisVoice | undefined, setSpeaking: (value: boolean) => void, setActiveWord: (value: number) => void) {
+  if (!("speechSynthesis" in window) || !voice) return;
   window.speechSynthesis.cancel();
+  setActiveWord(-1);
   const utterance = new SpeechSynthesisUtterance(text);
-  const voices = window.speechSynthesis.getVoices();
-  const voice = pickAmericanVoice(voices);
   if (voice) utterance.voice = voice;
   utterance.lang = "en-US";
-  utterance.rate = 0.9;
-  utterance.pitch = 0.96;
+  utterance.rate = 1;
+  utterance.pitch = 1;
   utterance.onstart = () => setSpeaking(true);
-  utterance.onend = () => setSpeaking(false);
-  utterance.onerror = () => setSpeaking(false);
-  window.speechSynthesis.speak(utterance);
+  utterance.onboundary = event => {
+    if (event.name === "word") setActiveWord(wordIndexAtCharacter(text, event.charIndex));
+  };
+  utterance.onend = () => { setSpeaking(false); setActiveWord(-1); };
+  utterance.onerror = () => { setSpeaking(false); setActiveWord(-1); };
+  window.setTimeout(() => window.speechSynthesis.speak(utterance), 80);
 }
 
 function Metric({ label, value, tone = "dark" }: { label: string; value: number; tone?: "dark" | "warm" | "green" }) {
@@ -93,6 +107,9 @@ export default function Home() {
   const [attempts, setAttempts] = useState<Record<string, number>>({});
   const [completedStages, setCompletedStages] = useState<string[]>([]);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [activeWordIndex, setActiveWordIndex] = useState(-1);
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoiceUri, setSelectedVoiceUri] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
   const [recordingError, setRecordingError] = useState<string | null>(null);
@@ -106,9 +123,18 @@ export default function Home() {
   const recorderRef = useRef<MediaRecorderWithState | null>(null);
   const recognitionRef = useRef<BrowserRecognition | null>(null);
   const stage = DAILY_STAGES[stageIndex];
+  const speechRecognitionSupported = typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+  const stageCaptionTokens = useMemo(() => {
+    let wordIndex = 0;
+    return (stage.sentence.match(/[A-Za-z']+|[^A-Za-z']+/g) ?? []).map(token => {
+      const isWord = /[A-Za-z']/.test(token);
+      return { token, wordIndex: isWord ? wordIndex++ : null };
+    });
+  }, [stage.sentence]);
   const currentAttempt = attempts[stage.id] ?? 0;
+  const selectedVoice = useMemo(() => availableVoices.find(voice => voice.voiceURI === selectedVoiceUri) ?? pickAmericanVoice(availableVoices), [availableVoices, selectedVoiceUri]);
   const transcriptEvaluation = transcript ? evaluateBrowserTranscript(stage.sentence, transcript) : null;
-  const currentSignal = transcriptEvaluation ?? practiceSignal(currentAttempt, Boolean(recordedUrl));
+  const currentSignal = transcriptEvaluation ?? { ...practiceSignal(currentAttempt, false), completeness: 0, overallScore: 0, passed: false };
   const dashboardQuery = trpc.practice.dashboard.useQuery(undefined, { enabled: isAuthenticated });
   const saveSentence = trpc.practice.saveSentenceAttempt.useMutation();
   const saveRoleplay = trpc.practice.saveSmallTalkResponse.useMutation();
@@ -145,6 +171,21 @@ export default function Home() {
       if (recordedUrl) URL.revokeObjectURL(recordedUrl);
     };
   }, [recordedUrl]);
+
+  useEffect(() => {
+    if (!("speechSynthesis" in window)) return;
+    const updateVoices = () => {
+      const englishVoices = window.speechSynthesis.getVoices().filter(voice => voice.lang.toLowerCase().startsWith("en"));
+      setAvailableVoices(englishVoices);
+      setSelectedVoiceUri(current => {
+        if (current && englishVoices.some(voice => voice.voiceURI === current)) return current;
+        return pickAmericanVoice(englishVoices)?.voiceURI ?? "";
+      });
+    };
+    updateVoices();
+    window.speechSynthesis.addEventListener("voiceschanged", updateVoices);
+    return () => window.speechSynthesis.removeEventListener("voiceschanged", updateVoices);
+  }, []);
 
   const startRecording = async (mode: "shadow" | "roleplay" = "shadow") => {
     setRecordingError(null);
@@ -192,6 +233,8 @@ export default function Home() {
         recognitionRef.current = recognition;
         recognition.start();
         setIsRecognizing(true);
+      } else if (mode === "shadow") {
+        setRecordingError("This browser cannot compare your words. Use a current Chrome or Edge browser for the word-by-word pass gate.");
       }
     } catch {
       setRecordingError("Microphone permission was not granted. Please allow access, then try again.");
@@ -284,12 +327,12 @@ export default function Home() {
               <div className="grid gap-8 lg:grid-cols-[1fr_230px] lg:items-start">
                 <div>
                   <div className="flex items-center gap-2"><span className="rounded-md bg-[#151514] px-2 py-1 text-[0.66rem] font-bold tracking-[.13em] text-white">{stage.eyebrow}</span><span className="text-sm font-semibold text-[#6e6b63]">{stage.category}</span></div>
-                  <h3 className="mt-5 max-w-2xl text-[1.85rem] font-bold leading-[1.2] tracking-[-.035em] sm:text-[2.35rem]">“{stage.sentence}”</h3>
-                  <div className="mt-5 flex flex-wrap items-center gap-3"><Button onClick={() => speakSentence(stage.sentence, setIsSpeaking)} variant="outline" className="active-press h-12 rounded-xl border-[#d8d4c9] bg-white px-4 text-sm font-bold hover:bg-[#f5f3ed]"><Headphones className="mr-2" size={18} /> {isSpeaking ? "Playing native-style demo" : "Listen first"}</Button><span className="text-sm text-[#6e6b63]">Browser voice · American English preferred</span></div>
+                  <h3 className="mt-5 max-w-2xl text-[1.85rem] font-bold leading-[1.45] tracking-[-.035em] sm:text-[2.35rem]" aria-label={`Reference sentence: ${stage.sentence}`}>“{stageCaptionTokens.map((part, index) => { if (part.wordIndex === null) return <span key={`${part.token}-${index}`}>{part.token}</span>; const feedback = transcriptEvaluation?.wordFeedback[part.wordIndex]; const isActive = activeWordIndex === part.wordIndex; const visualState = feedback ? (feedback.status === "matched" ? "border-[#b9dccf] bg-[#e6f2ed] text-[#1d6c59]" : feedback.status === "near" ? "border-[#efcf96] bg-[#fff1cf] text-[#9c6214]" : "border-[#efbeb7] bg-[#fce8e5] text-[#bf3d2e] line-through decoration-[#bf3d2e]/60") : isActive ? "border-[#151514] bg-[#151514] text-white shadow-sm" : "border-transparent text-[#151514]"; return <span key={`${part.token}-${index}`} className={`mx-[0.08em] inline rounded-md border px-[0.11em] py-[0.04em] transition-colors duration-150 ${visualState}`}>{part.token}</span>; })}”</h3>
+                  <div className="mt-5 flex flex-wrap items-center gap-3"><Button disabled={!selectedVoice} onClick={() => speakSentence(stage.sentence, selectedVoice, setIsSpeaking, setActiveWordIndex)} variant="outline" className="active-press h-12 rounded-xl border-[#d8d4c9] bg-white px-4 text-sm font-bold hover:bg-[#f5f3ed] disabled:cursor-not-allowed disabled:opacity-50"><Headphones className="mr-2" size={18} /> {isSpeaking ? "Playing karaoke demo" : "Listen first"}</Button>{availableVoices.length > 0 ? <label className="flex items-center gap-2 text-sm font-semibold text-[#55534d]"><span className="sr-only">English demonstration voice</span><select aria-label="English demonstration voice" value={selectedVoice?.voiceURI ?? ""} onChange={event => setSelectedVoiceUri(event.target.value)} className="h-12 max-w-[230px] rounded-xl border border-[#d8d4c9] bg-white px-3 text-sm font-semibold outline-none focus:border-[#1d6c59] focus:ring-2 focus:ring-[#1d6c59]/20">{availableVoices.map(voice => <option key={voice.voiceURI} value={voice.voiceURI}>{voice.name.replace(/Microsoft |Google /g, "")} · {voice.lang}</option>)}</select></label> : <span className="text-sm font-semibold text-[#9c451f]" role="status">Install or enable an English device voice to hear the demo.</span>}<span className="text-xs text-[#77746c]">US English preferred · normal speed</span></div>
                   <div className="mt-7 rounded-2xl border border-[#e5e2da] bg-[#fffefa] p-4"><div className="flex gap-3"><CircleHelp className="mt-0.5 shrink-0 text-[#9c451f]" size={19} /><p className="text-[0.95rem] leading-relaxed text-[#5f5d57]"><strong className="text-[#151514]">Coach&apos;s ear.</strong> {stage.coachingNote}</p></div></div>
-                  {transcriptEvaluation && <div className="reward-pop mt-4 rounded-2xl border border-[#d7e6de] bg-[#f5fbf8] p-4"><div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm font-bold text-[#1d6c59]">Browser heard: “{transcript}”</p><span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#1d6c59]">{currentSignal.completeness}% words matched</span></div><div className="mt-3 flex flex-wrap gap-1.5">{transcriptEvaluation.wordFeedback.map((item, index) => <span key={`${item.word}-${index}`} className={`rounded-md px-2 py-1 text-xs font-semibold ${item.matched ? "bg-[#e1f0e9] text-[#1d6c59]" : "bg-[#fce8dd] text-[#ad4c22]"}`}>{item.word}</span>)}</div><p className="mt-3 text-xs font-semibold text-[#6e6b63]">Green = recognised word · orange = say it once more. This is browser speech recognition, not clinical pronunciation scoring.</p></div>}
+                  {transcriptEvaluation && <div className="reward-pop mt-4 rounded-2xl border border-[#d7e6de] bg-[#f5fbf8] p-4"><div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm font-bold text-[#1d6c59]">Browser heard: “{transcript}”</p><span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#1d6c59]">{currentSignal.completeness}% words matched</span></div><div className="mt-3 flex flex-wrap gap-1.5">{transcriptEvaluation.wordFeedback.map((item, index) => <span key={`${item.word}-${index}`} className={`rounded-md px-2 py-1 text-xs font-semibold ${item.status === "matched" ? "bg-[#e1f0e9] text-[#1d6c59]" : item.status === "near" ? "bg-[#fff1cf] text-[#9c6214]" : "bg-[#fce8dd] text-[#ad4c22]"}`}>{item.word}</span>)}</div><p className="mt-3 text-xs font-semibold text-[#6e6b63]">Green = recognised match · orange = close text match, say it once more · red = not recognised. This is browser recognition, not clinical pronunciation scoring.</p></div>}
                 </div>
-                <aside className="rounded-[1.4rem] bg-[#f0eee7] p-5"><p className="eyebrow">Pass gate</p><p className="mt-2 text-[1.5rem] font-bold tracking-[-.04em]">{transcriptEvaluation ? "Match the message" : "Record once to unlock"}</p><p className="mt-2 text-sm leading-relaxed text-[#6e6b63]">{transcriptEvaluation ? "When your browser recognises at least 76% of the sentence, you may move on." : "This no-cost build saves your recording locally. On compatible browsers it will also compare recognised words; exact pronunciation scoring remains a future upgrade."}</p><div className="mt-5 grid grid-cols-2 gap-2"><Metric label="Clarity" value={currentSignal.accuracy} tone="green" /><Metric label="Flow" value={currentSignal.fluency} tone="warm" /></div></aside>
+                <aside className="rounded-[1.4rem] bg-[#f0eee7] p-5"><p className="eyebrow">Pass gate</p><p className="mt-2 text-[1.5rem] font-bold tracking-[-.04em]">{transcriptEvaluation ? "Match the message" : "Read to unlock"}</p><p className="mt-2 text-sm leading-relaxed text-[#6e6b63]">{transcriptEvaluation ? "At least 90% of the sentence must turn green. Red words were not recognised: say them again before you continue." : speechRecognitionSupported ? "Record your voice. The gate opens only after browser recognition checks the words you said." : "A browser word checker is required for this strict pass gate. Please use a current Chrome or Edge browser."}</p><div className="mt-5 grid grid-cols-2 gap-2"><Metric label="Match" value={currentSignal.completeness} tone="green" /><Metric label="Flow" value={currentSignal.fluency} tone="warm" /></div></aside>
               </div>
 
               <div className="mt-8 flex flex-col gap-4 border-t border-[#e5e2da] pt-7 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-lg font-bold">{isRecording ? "Recording your shadowing…" : recordedUrl ? "Recording saved. Play it back, then decide." : "Ready when you are."}</p><p className="mt-1 text-sm text-[#6e6b63]">{isRecognizing ? "Listening for your words…" : currentAttempt > 1 ? `Attempt ${currentAttempt} · your next take gets a fresh practice signal.` : "Take your time. Warmth is part of the message."}</p>{recordingError && <p className="mt-2 text-sm font-semibold text-[#b8402c]">{recordingError}</p>}</div><div className="flex flex-wrap gap-3">{recordedUrl && <Button variant="outline" onClick={() => new Audio(recordedUrl).play()} className="active-press h-12 rounded-xl border-[#d8d4c9] bg-white font-bold"><Play className="mr-2" size={17} /> Play back</Button>}{isRecording ? <Button onClick={stopRecording} className="active-press h-12 rounded-xl bg-[#b8402c] px-5 font-bold hover:bg-[#9f3424]"><Pause className="mr-2" size={17} /> Stop</Button> : recordedUrl ? <Button variant="outline" onClick={retryRecording} className="active-press h-12 rounded-xl border-[#d8d4c9] bg-white font-bold"><RotateCcw className="mr-2" size={17} /> Try again</Button> : <Button onClick={() => startRecording("shadow")} className="active-press h-12 rounded-xl bg-[#151514] px-5 font-bold hover:bg-[#383733]"><Mic className="mr-2" size={17} /> Record my voice</Button>}<Button disabled={!currentSignal.passed || completedStages.includes(stage.id)} onClick={passStage} className="active-press h-12 rounded-xl bg-[#1d6c59] px-5 font-bold hover:bg-[#165847]">Pass & continue <ChevronRight className="ml-1" size={17} /></Button></div></div>
