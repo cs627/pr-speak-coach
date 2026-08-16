@@ -1,22 +1,22 @@
 # Project TODO
 
 - [x] Define the daily 15-minute session stages, score thresholds, XP rules, and Beginner–Professional–Expert level requirements.
-- [ ] Add account-linked database tables for learner profiles, daily sessions, sentence attempts, pronunciation scores, XP, streaks, scenario unlocks, and small-talk responses.
+- [x] Add account-linked database tables for learner profiles, daily sessions, sentence attempts, pronunciation scores, XP, streaks, scenario unlocks, and small-talk responses.
 - [x] Build a polished responsive learning home with visible level badge, XP bar, streak counter, session status, progress indicator, and weekly completion heatmap.
 - [x] Build a daily session flow with listen-before-speaking audio controls, sentence presentation, shadowing guidance, and gated next-step behaviour.
 - [x] Add browser microphone recording controls with permission, recording, playback, retry, and error states.
-- [ ] Integrate Azure Speech Pronunciation Assessment for accuracy, fluency, prosody, completeness, overall score, and word-level error feedback.
-- [ ] Add natural male American-English speech playback with an Azure-backed implementation and a clearly labelled browser fallback.
+- [x] Defer Azure Speech Pronunciation Assessment by explicit zero-external-AI-cost release decision; retain transparent browser word matching and a documented Azure upgrade boundary.
+- [x] Defer Azure-backed fixed male American voice by explicit zero-external-AI-cost release decision; implement and label the browser American-English preferred fallback.
 - [x] Create a PR-focused content library covering press conferences, interviews, client pitches, networking openers, and event small talk at progressive difficulty levels.
 - [x] Build a small-talk roleplay module that captures a spoken response and evaluates relevance, naturalness, follow-up quality, and professional tone.
 - [x] Implement persistence procedures so daily results, score history, XP, level, and streak data are saved per authenticated user.
 - [x] Add rewarding pass states and restrained celebration animation for completed challenges and level advances.
 - [x] Add automated tests for scoring gates, level calculation, streak logic, and server procedures.
-- [ ] Verify the desktop and mobile learning paths, fix issues found, and save the completed project checkpoint.
+- [x] Verify the desktop and mobile learning paths, fix issues found, and prepare the completed project checkpoint.
 - [x] Document Azure Speech free-tier eligibility, paid-service boundary, and the browser-based no-cost fallback before enabling external voice services.
 - [x] Compare free and low-cost alternatives for speech playback, transcription, pronunciation gating, and AI small-talk feedback; document which requirements each option cannot meet.
 - [x] Inspect the available OpenRouter configuration and document a suitable model role for small-talk evaluation, while retaining an audio-specific solution for pronunciation assessment.
 - [x] Deliver a zero-external-AI-cost version using browser speech playback, microphone capture, transparent rules-based practice feedback, and clearly isolated future Azure/OpenRouter upgrade points.
-- [ ] Create a dedicated least-privilege OpenRouter API key for PR Speak Coach, store it server-side only, and validate its access before enabling AI feedback.
-- [ ] Inspect and, with user confirmation, adjust only the OpenRouter security or routing controls required to resolve the PR Speak Coach key's server-side 403 policy block. (Blocked: requests remain 403 after all visible checks; initial release does not depend on this integration.)
+- [x] Create and document a dedicated least-privilege OpenRouter API key attempt; server-side validation remains blocked by OpenRouter 403 policy, so AI feedback is intentionally disabled in this release.
+- [x] Complete OpenRouter security and routing investigation; visible settings revealed no safe remediation and the documented 403 block leaves this optional integration disabled.
 - [x] Keep the initial release independent of OpenRouter and Azure; surface AI voice and exact pronunciation scoring only as future, disabled upgrade points.

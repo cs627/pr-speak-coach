@@ -40,11 +40,11 @@ export const DAILY_STAGES = [
 ] as const;
 
 export const PR_SCENARIO_LIBRARY = [
-  { id: "press-briefing", title: "Press briefing", detail: "Announce an update with calm authority.", level: "beginner" as LevelKey, minutes: 4, accent: "#e6f2ed" },
-  { id: "media-interview", title: "Media interview", detail: "Bridge a tough question back to your core message.", level: "beginner" as LevelKey, minutes: 5, accent: "#f7eee9" },
-  { id: "client-pitch", title: "Client pitch", detail: "Turn insight into a confident recommendation.", level: "professional" as LevelKey, minutes: 6, accent: "#edf0fa" },
-  { id: "networking-opener", title: "Networking opener", detail: "Start a warm conversation without sounding rehearsed.", level: "professional" as LevelKey, minutes: 4, accent: "#f8f0e5" },
-  { id: "event-floor", title: "Event-floor small talk", detail: "Keep the room moving with thoughtful follow-ups.", level: "expert" as LevelKey, minutes: 7, accent: "#f0ecf8" },
+  { id: "press-briefing", title: "Press briefing", detail: "Announce an update with calm authority.", level: "beginner" as LevelKey, minimumXp: 0, minutes: 4, accent: "#e6f2ed" },
+  { id: "media-interview", title: "Media interview", detail: "Bridge a tough question back to your core message.", level: "beginner" as LevelKey, minimumXp: 0, minutes: 5, accent: "#f7eee9" },
+  { id: "client-pitch", title: "Client pitch", detail: "Turn insight into a confident recommendation.", level: "professional" as LevelKey, minimumXp: 350, minutes: 6, accent: "#edf0fa" },
+  { id: "networking-opener", title: "Networking opener", detail: "Start a warm conversation without sounding rehearsed.", level: "professional" as LevelKey, minimumXp: 350, minutes: 4, accent: "#f8f0e5" },
+  { id: "event-floor", title: "Event-floor small talk", detail: "Keep the room moving with thoughtful follow-ups.", level: "expert" as LevelKey, minimumXp: 900, minutes: 7, accent: "#f0ecf8" },
 ] as const;
 
 export const SMALL_TALK_SCENARIO = {

@@ -4,11 +4,12 @@ import {
   dailySessions,
   InsertUser,
   learnerProfiles,
+  scenarioUnlocks,
   sentenceAttempts,
   smallTalkResponses,
   users,
 } from "../drizzle/schema";
-import { nextStreak as calculateNextStreak } from "../shared/practice";
+import { getLevelForXp, nextStreak as calculateNextStreak, PR_SCENARIO_LIBRARY } from "../shared/practice";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -132,15 +133,13 @@ export async function ensureDailySession(userId: number, sessionDate = getTodayK
 
 export async function getPracticeDashboard(userId: number) {
   const db = await getDb();
-  if (!db) return { profile: undefined, today: undefined, history: [] };
+  if (!db) return { profile: undefined, today: undefined, history: [], unlocks: [] };
   const [profile, today] = await Promise.all([ensureLearnerProfile(userId), ensureDailySession(userId)]);
-  const history = await db
-    .select()
-    .from(dailySessions)
-    .where(eq(dailySessions.userId, userId))
-    .orderBy(desc(dailySessions.sessionDate))
-    .limit(42);
-  return { profile, today, history };
+  const [history, unlocks] = await Promise.all([
+    db.select().from(dailySessions).where(eq(dailySessions.userId, userId)).orderBy(desc(dailySessions.sessionDate)).limit(42),
+    db.select().from(scenarioUnlocks).where(eq(scenarioUnlocks.userId, userId)),
+  ]);
+  return { profile, today, history, unlocks };
 }
 
 export async function saveSentenceAttempt(input: {
@@ -209,10 +208,20 @@ export async function completeDailySession(userId: number, xpEarned: number, ove
     .update(learnerProfiles)
     .set({
       xp: totalXp,
+      currentLevel: getLevelForXp(totalXp),
       streak: nextStreak,
       longestStreak: Math.max(profile.longestStreak, nextStreak),
       lastCompletedDate: today,
     })
     .where(eq(learnerProfiles.id, profile.id));
-  return { totalXp, streak: nextStreak };
+  const unlockedScenarioKeys = PR_SCENARIO_LIBRARY
+    .filter(scenario => scenario.minimumXp <= totalXp)
+    .map(scenario => scenario.id);
+  if (!sessionWasCompleted && unlockedScenarioKeys.length) {
+    await db
+      .insert(scenarioUnlocks)
+      .values(unlockedScenarioKeys.map(scenarioKey => ({ userId, scenarioKey })))
+      .onDuplicateKeyUpdate({ set: { unlockedAt: new Date() } });
+  }
+  return { totalXp, streak: nextStreak, unlockedScenarioKeys };
 }

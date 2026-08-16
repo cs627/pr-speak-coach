@@ -103,7 +103,22 @@ export const smallTalkResponses = mysqlTable(
   table => [index("smallTalkResponses_session_idx").on(table.dailySessionId)],
 );
 
+export const scenarioUnlocks = mysqlTable(
+  "scenarioUnlocks",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    scenarioKey: varchar("scenarioKey", { length: 96 }).notNull(),
+    unlockedAt: timestamp("unlockedAt").defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex("scenarioUnlocks_user_scenario_unique").on(table.userId, table.scenarioKey),
+    index("scenarioUnlocks_user_idx").on(table.userId),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type LearnerProfile = typeof learnerProfiles.$inferSelect;
 export type DailySession = typeof dailySessions.$inferSelect;
+export type ScenarioUnlock = typeof scenarioUnlocks.$inferSelect;
